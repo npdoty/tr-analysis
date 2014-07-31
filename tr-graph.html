@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.bar rect {
+  fill: steelblue;
+  shape-rendering: crispEdges;
+}
+
+.bar text {
+  fill: #000;
+  font-size: 9px;
+}
+
+.axis path, .axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+figcaption {
+  font-style: italic;
+  font-size: 12px;
+}
+
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="tr-pretty.json"></script>
+</head>
+<body>
+<figure id="graph">
+  <figcaption>
+    Technical Reports published by W3C, by month    
+  </figcaption>
+</figure>
+<script>
+console.log(tr_list);
+
+// Generate a Bates distribution of 10 random variables.
+//var values = d3.range(1000).map(d3.random.bates(10));
+
+var values = tr_list;
+
+// A formatter for counts.
+//var formatCount = d3.format(",.0f");
+function formatCount(d) {
+  if (d==0) { return ""; }
+  return d;
+}
+
+// http://stackoverflow.com/questions/2752349/fast-rectangle-to-rectangle-intersection
+function intersect(a, b) {
+  return (a.left <= b.right &&
+          b.left <= a.right &&
+          a.top <= b.bottom &&
+          b.top <= a.bottom)
+}
+
+var margin = {top: 30, right: 30, bottom: 30, left: 30},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var x = d3.time.scale().domain(d3.extent(tr_list, function(d) {return new Date(d["date_published"]);})).nice(d3.time.month).range([0, width]);
+
+// Generate a histogram using twenty uniformly-spaced bins.
+var data = d3.layout.histogram()
+    .bins(x.ticks(d3.time.month, 1))
+    .value(function(d) { return new Date(d["date_published"]); })
+    (tr_list);
+
+var y = d3.scale.linear()
+    .domain([0, d3.max(data, function(d) { return d.y; })])
+    .range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var svg = d3.select("figure#graph").insert("svg", "figcaption")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var bar = svg.selectAll(".bar")
+    .data(data)
+  .enter().append("g")
+    .attr("class", "bar")
+    .attr("transform", transform);
+
+var barWidth = x(new Date(data[0].x.getTime() + data[0].dx));
+bar.append("rect")
+    .attr("x", 1)
+    .attr("width", barWidth)
+    .attr("height", function(d) { return height - y(d.y); });
+
+function transform(d) {
+  return "translate(" + x(d.x) + "," + y(d.y) + ")";
+}
+
+//bar.append("text")
+svg.append("g").selectAll("text").data(data).enter().append("text")
+    .attr("y", -5)
+    .attr("x", x(new Date(data[0].x.getTime() + data[0].dx)) / 2)
+    .attr("text-anchor", "middle")
+    .attr("transform", transform)
+    .attr("class", "label")
+    .text(function(d) { return formatCount(d.y); });
+
+var labels = svg.selectAll("text.label");
+var bounding_boxes = [];
+
+function intersectsThis(element, index, array) {
+  if (intersect(element, this)) {
+    console.log(element);
+    console.log(this);
+  }
+  return intersect(element, this);
+}
+
+bar.each(function(d, i){
+  bounds = this.getBoundingClientRect();
+  bounding_boxes.push(bounds);
+});
+
+labels.each(function(d, i){
+  bounds = this.getBoundingClientRect();
+  if (bounding_boxes.some(intersectsThis, bounds)) {
+    //this.remove();
+    d3.select(this).attr("fill", "red");
+    d3.select(this).remove();
+    //console.log(this);
+  } else {
+    bounding_boxes.push(bounds);
+  }
+});
+
+svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+
+</script>
+</body>
