@@ -12,6 +12,10 @@ body {
   shape-rendering: crispEdges;
 }
 
+#graph-privacy .bar rect {
+  fill: green;
+}
+
 .bar text {
   fill: #000;
   font-size: 9px;
@@ -28,26 +32,53 @@ figcaption {
   font-size: 12px;
 }
 
+figure svg {
+  display: inline-block;
+}
+
+div.sidebar {
+  border-left: 1px solid black;
+  display: inline-block;
+  vertical-align: top;
+  height: 500px;
+}
+
+ul {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  height: 500px;
+}
+li {
+  margin-left: 20px;
+}
+
 </style>
 <script src="http://d3js.org/d3.v3.min.js"></script>
 <script src="tr-pretty.json"></script>
 </head>
 <body>
 <figure id="graph">
+  <div class="sidebar">
+    <ul>
+    </ul>
+  </div>
   <figcaption>
     Technical Reports published by W3C, by month    
   </figcaption>
 </figure>
+<figure id="graph-privacy">
+  <div class="sidebar">
+    <ul>
+    </ul>
+  </div>
+  <figcaption>
+    Technical Reports mentioning "privacy" published by W3C, by month    
+  </figcaption>
+</figure>
 <script>
-console.log(tr_list);
+var values = tr_list;  // set in the loaded .json script
 
-// Generate a Bates distribution of 10 random variables.
-//var values = d3.range(1000).map(d3.random.bates(10));
-
-var values = tr_list;
-
-// A formatter for counts.
-//var formatCount = d3.format(",.0f");
 function formatCount(d) {
   if (d==0) { return ""; }
   return d;
@@ -67,83 +98,97 @@ var margin = {top: 30, right: 30, bottom: 30, left: 30},
 
 var x = d3.time.scale().domain(d3.extent(tr_list, function(d) {return new Date(d["date_published"]);})).nice(d3.time.month).range([0, width]);
 
-// Generate a histogram using twenty uniformly-spaced bins.
-var data = d3.layout.histogram()
-    .bins(x.ticks(d3.time.month, 1))
-    .value(function(d) { return new Date(d["date_published"]); })
-    (tr_list);
+insertHistogramForData(tr_list, "figure#graph");
 
-var y = d3.scale.linear()
-    .domain([0, d3.max(data, function(d) { return d.y; })])
-    .range([height, 0]);
+var privacy_list = tr_list.filter(function(el){
+  return (el["privacy_search"] > 0);
+});
+insertHistogramForData(privacy_list, "figure#graph-privacy");
 
-var xAxis = d3.svg.axis()
-    .scale(x)
-    .orient("bottom");
+function insertHistogramForData(data_list, insertion_selector) {
+  var data = d3.layout.histogram()
+      .bins(x.ticks(d3.time.month, 1))
+      .value(function(d) { return new Date(d["date_published"]); })
+      (data_list);
 
-var svg = d3.select("figure#graph").insert("svg", "figcaption")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-  .append("g")
-    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+  var y = d3.scale.linear()
+      .domain([0, d3.max(data, function(d) { return d.y; })])
+      .range([height, 0]);
+      
+  function transform(d) {
+    return "translate(" + x(d.x) + "," + y(d.y) + ")";
+  }
 
-var bar = svg.selectAll(".bar")
-    .data(data)
-  .enter().append("g")
-    .attr("class", "bar")
-    .attr("transform", transform);
+  var svg = d3.select(insertion_selector).insert("svg", "div")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-var barWidth = x(new Date(data[0].x.getTime() + data[0].dx));
-bar.append("rect")
-    .attr("x", 1)
-    .attr("width", barWidth)
-    .attr("height", function(d) { return height - y(d.y); });
+  var bar = svg.selectAll(".bar")
+      .data(data)
+    .enter().append("g")
+      .attr("class", "bar")
+      .attr("transform", transform);
 
-function transform(d) {
-  return "translate(" + x(d.x) + "," + y(d.y) + ")";
+  var barWidth = x(new Date(data[0].x.getTime() + data[0].dx));
+  bar.append("rect")
+      .attr("x", 1)
+      .attr("width", barWidth)
+      .attr("height", function(d) { return height - y(d.y); });
+
+  svg.append("g").selectAll("text").data(data).enter().append("text")
+      .attr("y", -5)
+      .attr("x", x(new Date(data[0].x.getTime() + data[0].dx)) / 2)
+      .attr("text-anchor", "middle")
+      .attr("transform", transform)
+      .attr("class", "label")
+      .text(function(d) { return formatCount(d.y); });
+
+  var labels = svg.selectAll("text.label");
+  var bounding_boxes = [];
+  
+  bar.each(function(d, i){
+    bounds = this.getBoundingClientRect();
+    bounding_boxes.push(bounds);
+  });
+
+  labels.each(function(d, i){
+    bounds = this.getBoundingClientRect();
+    if (bounding_boxes.some(intersectsThis, bounds)) {
+      d3.select(this).remove();
+    } else {
+      bounding_boxes.push(bounds);
+    }
+  });
+
+  var xAxis = d3.svg.axis()
+      .scale(x)
+      .orient("bottom");
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+  
+  bar.on("mouseover", function(d){
+    var slist = d3.select(this.parentNode.parentNode.parentNode).select("ul").selectAll("li").data(d);
+    slist.enter().append("li")
+      .each(function(){
+        d3.select(this).insert("a");
+      });  // add more list items as necessary
+    
+    slist.each(function(d){    // if you use .each to insert nested nodes, use .each again to update them
+      d3.select(this).select("a")
+        .attr("href", d["href"])
+        .text(d["short_name"]);
+    });  // make all list items use the appropriate name
+      
+    slist.exit().remove();  // remove any list items now unnecessary
+  });
 }
-
-//bar.append("text")
-svg.append("g").selectAll("text").data(data).enter().append("text")
-    .attr("y", -5)
-    .attr("x", x(new Date(data[0].x.getTime() + data[0].dx)) / 2)
-    .attr("text-anchor", "middle")
-    .attr("transform", transform)
-    .attr("class", "label")
-    .text(function(d) { return formatCount(d.y); });
-
-var labels = svg.selectAll("text.label");
-var bounding_boxes = [];
 
 function intersectsThis(element, index, array) {
-  if (intersect(element, this)) {
-    console.log(element);
-    console.log(this);
-  }
   return intersect(element, this);
 }
-
-bar.each(function(d, i){
-  bounds = this.getBoundingClientRect();
-  bounding_boxes.push(bounds);
-});
-
-labels.each(function(d, i){
-  bounds = this.getBoundingClientRect();
-  if (bounding_boxes.some(intersectsThis, bounds)) {
-    //this.remove();
-    d3.select(this).attr("fill", "red");
-    d3.select(this).remove();
-    //console.log(this);
-  } else {
-    bounding_boxes.push(bounds);
-  }
-});
-
-svg.append("g")
-    .attr("class", "x axis")
-    .attr("transform", "translate(0," + height + ")")
-    .call(xAxis);
-
 </script>
 </body>
