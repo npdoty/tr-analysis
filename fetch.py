@@ -38,11 +38,19 @@ for row in rows:
   #pp(title_link.string)
   entry['href'] = title_link.get('href')
   entry['short_name'] = title_link.get('href').rstrip('/').split('/')[-1]
+  status_link = row.select('td:nth-of-type(3) > a:nth-of-type(1)')[0]
+  entry['document_status'] = unicode(status_link.string).encode('utf-8')
   entries.append(entry)
 
-for entry in entries:
-  directory = archive_directory(entry['short_name'])
-  collect_html(directory, entry['short_name'], entry['href'])
+pp(len(entries))
+
+entries = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in entries)]
+
+pp(len(entries))
+
+# for entry in entries:
+#   directory = archive_directory(entry['short_name'])
+#   collect_html(directory, entry['short_name'], entry['href'])
 
 with open('tr.json', 'wb') as jsonfile:
   jsonfile.write(json.dumps(entries))
