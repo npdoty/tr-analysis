@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.bar rect {
+  fill: steelblue;
+  shape-rendering: crispEdges;
+}
+
+#graph-privacy .bar rect {
+  fill: green;
+}
+
+.bar text {
+  fill: #000;
+  font-size: 9px;
+}
+
+.axis path, .axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+figcaption {
+  font-style: italic;
+  font-size: 12px;
+}
+
+figure svg {
+  display: inline-block;
+}
+
+div.sidebar {
+  border-left: 1px solid black;
+  display: inline-block;
+  vertical-align: top;
+  height: 500px;
+}
+
+ul {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  height: 500px;
+}
+li {
+  margin-left: 20px;
+}
+
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="tr-pretty.json"></script>
+<title>List of W3C Technical Reports by Search Term</title>
+</head>
+<body>
+<h3>W3C Technical Reports by Search Term</h3>
+<h4>privacy</h4>
+<p>
+  Count: <span id="count"></span>
+</p>
+<table id="tr_table">
+  <thead>
+    <tr>
+    </tr>
+  </thead>
+  <tbody>
+    
+  </tbody>
+</table>
+<script>
+var privacy_list = tr_list
+  .filter(function(el){
+    return (el["privacy_search"] > 0);
+  })
+  .filter(function(el){  // as a test, hide Notes and Retired documents
+    return (!(el["document_status"] == "Group Note" || el["document_status"] == "Retired"));
+  })
+  .sort(function(a,b){
+    return b["privacy_search"] - a["privacy_search"]
+  });
+
+var headers = {
+  "title": "title",
+  "short_name": "short name",
+  "date_published": "date published",
+  "document_status": "status"
+};
+var columns = ["title", "short_name", "date_published", "document_status"];
+
+// d3 table creation in part from: http://stackoverflow.com/questions/9268645/creating-a-table-linked-to-a-csv-file
+
+d3.select("#count").text(privacy_list.length);
+
+d3.select("thead").select("tr").selectAll("th").data(columns)
+  .enter()
+  .append("th")
+  .text(function(d){ return headers[d]; });
+
+var rows = d3.select("tbody").selectAll("tr").data(privacy_list)
+             .enter()
+             .append("tr");
+var cells = rows.selectAll("td")
+                .data(function(row){
+                  return columns.map(function(column) {
+                    
+                    return {column: column, value: row[column], item: row};
+                  })
+                })
+                .enter()
+                .append("td");
+                
+cells.each(function(d){
+  if (d.column == "title") {
+    d3.select(this).insert("a").attr("href", d.item["href"]).text(d.value);
+  } else {
+    d3.select(this).text(d.value);
+  }
+});
+</script>
+</body>
